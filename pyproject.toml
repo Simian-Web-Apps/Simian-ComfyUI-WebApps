@@ -1,0 +1,17 @@
+[project]
+name = "Simian-ComfyUI-WebApps"
+description = "Simian webapp integration for ComfyUI webapp api nodes."
+authors = [
+    { name = "MonkeyProof Solutions B.V.", email = "info@simiansuite.com" },
+]
+dependencies = [
+    "pillow",
+    "simian-gui",
+    "simian-local",
+    "ComfyUI_webapp @git+https://github.com/MonkeyProof-Solutions-BV/ComfyUI_webapp]",
+]
+requires-python = ">= 3.10"
+optional-dependencies.dev = ["simian-builder"]
+
+[tool.ruff]
+line-length = 100

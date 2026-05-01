@@ -1,0 +1,1 @@
+Simian-ComfyUI-WebApps @git+https://github.com/Simian-Web-Apps/Simian-ComfyUI-WebApps
