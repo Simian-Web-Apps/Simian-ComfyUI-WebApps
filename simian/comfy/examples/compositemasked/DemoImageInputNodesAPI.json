@@ -1,0 +1,199 @@
+{
+    "2": {
+        "inputs": {
+            "x": [
+                "33",
+                0
+            ],
+            "y": [
+                "34",
+                0
+            ],
+            "resize_source": false,
+            "destination": [
+                "8",
+                0
+            ],
+            "source": [
+                "31",
+                0
+            ],
+            "mask": [
+                "31",
+                1
+            ]
+        },
+        "class_type": "ImageCompositeMasked",
+        "_meta": {
+            "title": "ImageCompositeMasked"
+        }
+    },
+    "5": {
+        "inputs": {
+            "filename_prefix": "ComfyUI",
+            "images": [
+                "2",
+                0
+            ]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+            "title": "Save Image"
+        }
+    },
+    "8": {
+        "inputs": {
+            "image": [
+                "30",
+                0
+            ]
+        },
+        "class_type": "ImageListToBatch+",
+        "_meta": {
+            "title": "🔧 Image List To Batch"
+        }
+    },
+    "26": {
+        "inputs": {
+            "description": "ComfyUI WebApp API example where a masked input image is pasted on background images in the specified coordinates from the top-left.",
+            "order": 10,
+            "tooltip": ""
+        },
+        "class_type": "WebApp_Description",
+        "_meta": {
+            "title": "Description"
+        }
+    },
+    "28": {
+        "inputs": {
+            "order": [
+                "35",
+                1
+            ],
+            "Advanced": false,
+            "mode": "Tab"
+        },
+        "class_type": "WebApp_Grouping",
+        "_meta": {
+            "title": "Coordinates"
+        }
+    },
+    "29": {
+        "inputs": {
+            "order": 10,
+            "Advanced": false,
+            "mode": "Repeating",
+            "mode.minimum": 1,
+            "mode.maximum": 3,
+            "parent": [
+                "28",
+                0
+            ]
+        },
+        "class_type": "WebApp_Grouping",
+        "_meta": {
+            "title": "Repeat"
+        }
+    },
+    "30": {
+        "inputs": {
+            "image_base64": "",
+            "mask_base64": "",
+            "order": 12,
+            "tooltip": "The background image to paste the masked image on."
+        },
+        "class_type": "WebApp_MaskedImageinput",
+        "_meta": {
+            "title": "Background"
+        }
+    },
+    "31": {
+        "inputs": {
+            "image_base64": "",
+            "mask_base64": "",
+            "order": 10,
+            "tooltip": "Highlight the part of the image to be pasted on the backgrounds.",
+            "parent": [
+                "37",
+                0
+            ]
+        },
+        "class_type": "WebApp_MaskedImageinput",
+        "_meta": {
+            "title": "Object images"
+        }
+    },
+    "33": {
+        "inputs": {
+            "value_in": 0,
+            "order": 10,
+            "advanced": false,
+            "value_from_interface": "",
+            "default": 250,
+            "minimum": 0,
+            "maximum": 500,
+            "step": 10,
+            "tooltip": "Number of pixels from the left of the background image to paste the masked image.",
+            "parent": [
+                "29",
+                0
+            ]
+        },
+        "class_type": "WebApp_Integerinput",
+        "_meta": {
+            "title": "X-coordinate"
+        }
+    },
+    "34": {
+        "inputs": {
+            "value_in": 0,
+            "order": 10,
+            "advanced": false,
+            "value_from_interface": "",
+            "default": 250,
+            "minimum": 0,
+            "maximum": 500,
+            "step": 10,
+            "tooltip": "Number of pixels from the top of the background image to paste the masked image.",
+            "parent": [
+                "28",
+                0
+            ]
+        },
+        "class_type": "WebApp_Integerinput",
+        "_meta": {
+            "title": "Y-coordinates"
+        }
+    },
+    "35": {
+        "inputs": {
+            "order": [
+                "26",
+                0
+            ],
+            "Advanced": false,
+            "mode": "Tab"
+        },
+        "class_type": "WebApp_Grouping",
+        "_meta": {
+            "title": "Object image"
+        }
+    },
+    "37": {
+        "inputs": {
+            "order": 10,
+            "Advanced": false,
+            "mode": "Repeating",
+            "mode.minimum": 1,
+            "mode.maximum": 2,
+            "parent": [
+                "35",
+                0
+            ]
+        },
+        "class_type": "WebApp_Grouping",
+        "_meta": {
+            "title": "Grouping"
+        }
+    }
+}
