@@ -8,10 +8,13 @@ dependencies = [
     "pillow",
     "simian-gui",
     "simian-local",
-    "ComfyUI_webapp @git+https://github.com/MonkeyProof-Solutions-BV/ComfyUI_webapp]",
+    "ComfyUI_webapp @git+https://github.com/MonkeyProof-Solutions-BV/ComfyUI_webapp",
 ]
 requires-python = ">= 3.10"
 optional-dependencies.dev = ["simian-builder"]
+version = '0.1.0'
+license = "GNU General Public License v3.0"
+license-files = ["LICENSE"]
 
 [tool.ruff]
 line-length = 100

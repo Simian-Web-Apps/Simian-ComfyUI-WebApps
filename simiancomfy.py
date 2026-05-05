@@ -7,15 +7,10 @@ import json
 import math
 import os
 import re
-import sys
 from typing import Sequence
 from urllib import request
 
 from PIL import Image, ImageDraw
-
-sys.path.append(r"C:\Files\_webframework\python\Implementation\simian-gui")
-sys.path.append(r"C:\Files\_webframework\python\Implementation\simian-local")
-sys.path.append(r"C:\Programs\ComfyUI\ComfyUI_windows_portable\ComfyUI\custom_nodes\ComfyUI_webapp")
 
 import plotly.graph_objects as go
 from interpret_json import process_workflow_api
@@ -23,11 +18,10 @@ from simian.gui import Form, component, component_properties, utils
 
 CONFIG = {}
 
-CONFIG["group_nesting"] = ["panels"]
 CONFIG["panels_collapsible"] = True
 CONFIG["save_intermediates"] = True
 
-DETECTED_FILES = {
+LOCATIONS = {
     "workflow": None,
     "simian_config": None,
 }
@@ -37,42 +31,38 @@ DETECTED_FILES = {
 # TODO: process tooltips
 # TODO: show created images somewhere and allow downloading?
 # TODO: Connect with web sockets + extra configs
-
-GROUP_TYPES = {
-    "tabs": component.Tabs,
-    "columns": component.Columns,
-    "panels": component.Panel,
-}
-COMPONENT_DICT = {
-    "WebApp_Description": component.HtmlElement,
-    "WebApp_Integerinput": component.Number,
-    "WebApp_FloatInput": component.Number,
-}
+# TODO: Numeric inputs as sliders
 
 
 def add_group(type_str: str, group_dict, parent) -> component.Component:
-    if type_str == "panels":
+    if type_str == "Section":
         # Always a new one
         new_comp = component.Panel(key=f"comp_{group_dict['id']}", parent=parent)
         new_comp.title = group_dict["_meta"]["title"]
         new_comp.collapsible = CONFIG["panels_collapsible"]
 
-    elif type_str == "tabs":
-        if isinstance(parent.components[-1], component.Tabs):
-            tab_comp = parent.components[-1]
+    elif type_str == "Tab":
+        for comp in parent.components:
+            if isinstance(comp, component.Tabs):
+                tab_comp = comp
+                break
         else:
+            # No Tab component found in the for loop. Create a new one.
             tab_comp = component.Tabs(key=f"comp_{group_dict['id']}", parent=parent)
 
         new_comp = tab_comp.addTab(group_dict["_meta"]["title"], key=f"tab{group_dict['id']}")
 
-    elif type_str == "columns":
-        if isinstance(col_comp := parent.components[-1], component.Columns):
-            # col_comp = parent.components[-1]
-            new_width = math.floor(12 / (len(col_comp.columns) + 1))
+    elif type_str == "Column":
+        for comp in parent.components:
+            if isinstance(comp, component.Columns):
+                col_comp = comp
+                new_width = math.floor(12 / (len(col_comp.columns) + 1))
 
-            for col in col_comp.columns:
-                col.width = new_width
+                for col in col_comp.columns:
+                    col.width = new_width
+                break
         else:
+            # No Columns component found in the for loop. Create a new one.
             col_comp = component.Columns(key=f"comp_{group_dict['id']}", parent=parent)
             new_width = 6
 
@@ -215,9 +205,11 @@ def scan_resources(calling_file: str):
                 continue
 
         if "inputs" in list(json_dict.values())[0]:
-            DETECTED_FILES["workflow"] = full_file
+            LOCATIONS["workflow"] = full_file
+            LOCATIONS["generated"] = os.path.join(os.path.dirname(full_file), "generated")
+            os.makedirs(LOCATIONS["generated"], exist_ok=True)
         elif "rootlevel" in json_dict:
-            DETECTED_FILES["simian_config"] = full_file
+            LOCATIONS["simian_config"] = full_file
 
 
 def convert_api_to_app(form: Form) -> None:
@@ -226,13 +218,11 @@ def convert_api_to_app(form: Form) -> None:
     Args:
         form: Simian Form to add the components to.
     """
-    if DETECTED_FILES["workflow"] is not None:
-        app_nodes_dict = process_workflow_api(DETECTED_FILES["workflow"])
+    if LOCATIONS["workflow"] is not None:
+        app_nodes_dict = process_workflow_api(LOCATIONS["workflow"])
 
         if CONFIG.get("save_intermediates", False):
-            with open(
-                os.path.join(os.path.dirname(DETECTED_FILES["workflow"]), "interpreted.json"), "w+"
-            ) as f:
+            with open(os.path.join(LOCATIONS["generated"], "interpreted.json"), "w+") as f:
                 json.dump(app_nodes_dict, f)
 
         root_cont = app_nodes_dict.pop("root", [])
@@ -257,19 +247,14 @@ def node_dict_to_component(all_nodes: dict, node: dict, level: int, parent):
         parent.addComponent(new_node)
 
     elif node["class_type"] == "WebApp_Grouping":
-        if level + 1 <= len(CONFIG["group_nesting"]):
-            group_type = CONFIG["group_nesting"][level]
-        else:
-            group_type = "panels"
-
-        new_sub_comp = add_group(type_str=group_type, group_dict=node, parent=parent)
+        group_type = node["inputs"]["mode"]
 
         # TODO: what if parent is a Panel and we are adding a DataGrid with comps. Remove the panel, as not needed for grouping
 
         child_nodes = all_nodes[node["id"]]
 
         if node["inputs"]["mode"] != "Repeating":
-            pass
+            new_sub_comp = add_group(type_str=group_type, group_dict=node, parent=parent)
 
         # elif len(child_nodes) == 1:
         #     new_node = create_comp(child_nodes[0])
@@ -291,6 +276,7 @@ def node_dict_to_component(all_nodes: dict, node: dict, level: int, parent):
         #         )
 
         else:
+            new_sub_comp = parent
             component.Hidden(key=f"hid_{node['id']}", parent=new_sub_comp)
 
             assert not isinstance(new_sub_comp, component.DataGrid), (
@@ -317,11 +303,8 @@ def gui_init(meta_data: dict) -> dict:
 
     convert_api_to_app(form)
 
-    if DETECTED_FILES["workflow"] is not None and CONFIG.get("save_intermediates", False):
-        with open(
-            os.path.join(os.path.dirname(DETECTED_FILES["workflow"]), "created_form.json"),
-            "w+",
-        ) as f:
+    if LOCATIONS["workflow"] is not None and CONFIG.get("save_intermediates", False):
+        with open(os.path.join(LOCATIONS["generated"], "created_form.json"), "w+") as f:
             print(form.jsonEncode(), file=f)
 
     return {"form": form}
@@ -336,16 +319,14 @@ def gui_event(meta_data: dict, payload: dict) -> dict:
 def run_workflow(_meta_data, payload):
     print(payload["submission"]["data"])
 
-    with open(DETECTED_FILES["workflow"]) as f:
+    with open(LOCATIONS["workflow"]) as f:
         prompt = json.load(f)
 
     process_component_values(prompt, payload["submission"]["data"])
 
     if CONFIG.get("save_intermediates", False):
         # Save the prompt we are about to send to a local file for troubleshooting.
-        with open(
-            os.path.join(os.path.dirname(DETECTED_FILES["workflow"]), "sent_prompt.json"), "w+"
-        ) as f:
+        with open(os.path.join(LOCATIONS["generated"], "sent_prompt.json"), "w+") as f:
             json.dump(prompt, f)
 
     data = json.dumps({"prompt": prompt}).encode("utf-8")
@@ -362,7 +343,7 @@ def process_component_values(prompt: dict, data: dict):
         prompt: dictionary with the workflow API that we need to fill with the app values.
         data: dictionary with app values to insert into the prompt.
     """
-    app_nodes_dict = process_workflow_api(DETECTED_FILES["workflow"])
+    app_nodes_dict = process_workflow_api(LOCATIONS["workflow"])
 
     # Insert the values from the app.
     for comp_id, value in data.items():
@@ -412,8 +393,10 @@ def process_image_to_str(file_data: list[dict] | list[dict]) -> str:
     Returns:
         Base64 encoded string of the selected image file.
     """
-    if isinstance(file_data, list):
+    if isinstance(file_data, list) and len(file_data) > 0:
         file_data = file_data[0]
+    else:
+        file_data = {}
 
     url = file_data.get("url", "")
 
@@ -472,6 +455,6 @@ def process_mask_to_str(plot_data: dict) -> str:
     new_image.save(buffered, format="jpeg")
 
     if CONFIG.get("save_intermediates", False):
-        new_image.save(os.path.join(os.path.dirname(DETECTED_FILES["workflow"]), "mask.png"))
+        new_image.save(os.path.join(LOCATIONS["generated"], "mask.png"))
 
     return base64.b64encode(buffered.getvalue()).decode("utf-8")

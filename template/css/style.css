@@ -18,6 +18,14 @@ html {
     margin-bottom: 0.5rem;
 }
 
+.form-wrapper {
+    width: 1000px;
+    justify-self: center;
+    margin-right: auto;
+    margin-left: auto;
+    margin-left: auto;
+}
+
 .dialog:not(.formio-hidden) {
     position: fixed;
     z-index: 1020;
