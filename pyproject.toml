@@ -8,6 +8,7 @@ dependencies = [
     "pillow",
     "simian-gui",
     "simian-local",
+    "websocket-client~=1.8.0",
     "ComfyUI_webapp @git+https://github.com/MonkeyProof-Solutions-BV/ComfyUI_webapp",
 ]
 requires-python = ">= 3.10"

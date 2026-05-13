@@ -1,4 +1,42 @@
-"""Convert ComfyUI API workflow containing webapp API nodes to a Simian web app."""
+"""Convert ComfyUI API workflow containing webapp API nodes to a Simian web app.
+
+https://doc.simiansuite.com/simian-gui/index.html
+
+All fields in the `app_data ` field of the `meta_data` dictionary are put in the corresponding
+environment variables.
+
+The ComfyUI server integration expects the following variables to be available in the environment.
+- COMFY_SERVER: The ComfyUI server address to connect to. Defaults to 127.0.0.1:8188
+
+- Adds a Basic authorization header with the following variables - if set.
+  - COMFY_USER: The authorized user name to connect with the server.
+  - COMFY_PASSWORD: The password for the user. Is encoded before it is put in the header.
+
+Note that key-values in the `meta_data`["Application_data"] dictionary are added to the environment variables.
+
+
+The `CONFIG` dictionary controls several aspects of the generated web app. overriding the options
+before starting the app will affect how it looks and its behaviour.
+
+- `app_title` (str, default: "Simian-ComfyUI app")
+  Title shown in the navigation bar of the app.
+- `app_subtitle` (str, default: "Demonstrator")
+  Subtitle shown in the navigation bar of the app.
+- `custom_results_download` (callable | None, default: None)
+  Optional custom function that receives the `payload` and a list of file paths which it can show
+  in custom components in the app, or upload the results to an external service.
+- `default_results_download` (bool, default: True)
+  When True, the app contains a ResultFile component that lets users download the images produced
+  by the workflow.
+- `panels_collapsible` (bool, default: True)
+  Determines whether panels that contain grouped components are collapsible.
+- `panels_collapsed` (bool, default: False)
+  When `panels_collapsible` is True, this flag sets the initial collapsed state of the panels.
+- `save_intermediates` (bool, default: False)
+  If enabled, intermediate JSON representations of the interpreted workflow, the prompt sent to the
+  server, and any generated mask images are written to the "generated" directory next to the
+  workflow file. This is useful for debugging and troubleshooting.
+"""
 
 import base64
 import glob
@@ -8,18 +46,31 @@ import math
 import os
 import re
 from typing import Sequence
-from urllib import request
-
-from PIL import Image, ImageDraw
 
 import plotly.graph_objects as go
-from interpret_json import process_workflow_api
+from PIL import Image, ImageDraw
 from simian.gui import Form, component, component_properties, utils
 
-CONFIG = {}
+import simian.comfy.connect
+from interpret_json import process_workflow_api
 
-CONFIG["panels_collapsible"] = True
-CONFIG["save_intermediates"] = True
+try:
+    import webview
+
+    webview.settings["ALLOW_DOWNLOADS"] = True
+except ImportError:
+    # Not run locally. In which case there is no problem.
+    pass
+
+CONFIG = {
+    "app_title": "Simian-ComfyUI app",
+    "app_subtitle": "Demonstrator",
+    "custom_results_download": None,
+    "default_results_download": True,
+    "panels_collapsible": True,
+    "panels_collapsed": False,
+    "save_intermediates": False,
+}
 
 LOCATIONS = {
     "workflow": None,
@@ -29,17 +80,31 @@ LOCATIONS = {
 
 # TODO: put Advanced components in own subpanels(?) or just hide until a central(?) tickbox is ticked.
 # TODO: process tooltips
-# TODO: show created images somewhere and allow downloading?
-# TODO: Connect with web sockets + extra configs
+# TODO: show created images somewhere?
 # TODO: Numeric inputs as sliders
 
 
 def add_group(type_str: str, group_dict, parent) -> component.Component:
+    """Add a layout component to the app.
+
+    Args:
+        type_str:   The type of the layout to add.
+        group_dict: The inputs selected for the Grouping node.
+        parent:     The location in the app to add the layout component to.
+
+    Raises:
+        ValueError: When the Grouping node has an unknown type selected.
+
+    Returns:
+        The created layout component to add other components to.
+    """
     if type_str == "Section":
         # Always a new one
         new_comp = component.Panel(key=f"comp_{group_dict['id']}", parent=parent)
         new_comp.title = group_dict["_meta"]["title"]
-        new_comp.collapsible = CONFIG["panels_collapsible"]
+        new_comp.collapsible = group_dict["inputs"]["collapsible"]
+        if new_comp.collapsible:
+            new_comp.collapsed = CONFIG["panels_collapsed"]
 
     elif type_str == "Tab":
         for comp in parent.components:
@@ -72,10 +137,13 @@ def add_group(type_str: str, group_dict, parent) -> component.Component:
         descr = component.HtmlElement(f"label_{group_dict['id']}", parent=new_col)
         descr.content = group_dict["_meta"]["title"]
 
+    else:
+        raise ValueError(f"Unknown Grouping type '{type_str}'.")
+
     return new_comp
 
 
-def create_comp(node: dict) -> component.Component:
+def create_comp(node: dict) -> component.Component | None:
     """Create a Simian componenf from a ComfyUI webapp node.
 
     Args:
@@ -135,6 +203,9 @@ def create_comp(node: dict) -> component.Component:
         new_comp.label = node["_meta"]["title"]
         new_comp.collapsible = CONFIG["panels_collapsible"]
 
+        if new_comp.collapsible:
+            new_comp.collapsed = CONFIG["panels_collapsed"]
+
         if node["inputs"]["is_image_used"]:
             upload_image = component.File(f"upload_{node['id']}", parent=new_comp)
             upload_image.filePattern = "image/*"
@@ -147,6 +218,7 @@ def create_comp(node: dict) -> component.Component:
             {"modeBarButtonsToRemove": ["pan", "zoom", "zoomin", "zoomout"]}
         )
         plot_obj.customConditional = f"show = row.upload_{node['id']}.length > 0"
+        plot_obj.redrawOn = "data"
 
         # Use the image selected in the File component as background in the Plotly component.
         plot_obj.calculateValue = (
@@ -165,7 +237,6 @@ def create_comp(node: dict) -> component.Component:
             # The image may be masked. Enable drawing shapes in the image.
             plot_obj.figure.update_layout(
                 dragmode="drawrect",
-                newshape_line_color="black",
                 newshape_fillcolor="white",
                 newshape_opacity=0.75,
             )
@@ -182,6 +253,7 @@ def create_comp(node: dict) -> component.Component:
             )
 
     else:
+        # Not a normal component. Return a None.
         new_comp = None
 
     return new_comp
@@ -208,6 +280,7 @@ def scan_resources(calling_file: str):
             LOCATIONS["workflow"] = full_file
             LOCATIONS["generated"] = os.path.join(os.path.dirname(full_file), "generated")
             os.makedirs(LOCATIONS["generated"], exist_ok=True)
+
         elif "rootlevel" in json_dict:
             LOCATIONS["simian_config"] = full_file
 
@@ -237,13 +310,25 @@ def convert_api_to_app(form: Form) -> None:
             button = component.Button("run_workflow", form)
             button.label = "Run workflow"
             button.setEvent("RunWorkflow")
+
+        if CONFIG["default_results_download"]:
+            results_panel = component.Panel("results_panel", form)
+            results_panel.label = "Results"
+            results_panel.collapsible = True
+            results_panel.collapsed = True
+
+            results_file = component.ResultFile("results_file", results_panel)
+            results_file.label = "Files created in workflow"
+
     else:
         descr = component.HtmlElement("NoResourcesDetected", form)
         descr.content = "No workflow API detected."
 
 
-def node_dict_to_component(all_nodes: dict, node: dict, level: int, parent):
+def node_dict_to_component(all_nodes: dict, node: dict, level: int, parent) -> None:
+    """Node dict to component conversion function."""
     if (new_node := create_comp(node)) is not None:
+        # A compent was created in create_comp. Just add it to the parent.
         parent.addComponent(new_node)
 
     elif node["class_type"] == "WebApp_Grouping":
@@ -253,32 +338,13 @@ def node_dict_to_component(all_nodes: dict, node: dict, level: int, parent):
 
         child_nodes = all_nodes[node["id"]]
 
-        if node["inputs"]["mode"] != "Repeating":
+        if group_type != "Repeating":
+            # Standard grouping node. Just create the layout component.
             new_sub_comp = add_group(type_str=group_type, group_dict=node, parent=parent)
 
-        # elif len(child_nodes) == 1:
-        #     new_node = create_comp(child_nodes[0])
-        #     if hasattr(new_node, "multiple"):
-        #         new_node.multiple = True
-        #         component_properties.Validate.create(
-        #             new_node,
-        #             minLength=node["inputs"].get("mode.minimum", 1),
-        #             maxLength=node["inputs"].get("mode.maximum", 1),
-        #         )
-        #         new_sub_comp.addComponent(new_node)
-        #         return
-        #     else:
-        #         new_sub_comp = component.DataGrid(key=f"rep_{node['id']}", parent=new_sub_comp)
-        #         component_properties.Validate.create(
-        #             new_sub_comp,
-        #             minLength=node["inputs"].get("mode.minimum", 1),
-        #             maxLength=node["inputs"].get("mode.maximum", 1),
-        #         )
-
         else:
+            # Repeating component - create a DataGrid as parent with a configurable number of rows.
             new_sub_comp = parent
-            component.Hidden(key=f"hid_{node['id']}", parent=new_sub_comp)
-
             assert not isinstance(new_sub_comp, component.DataGrid), (
                 "Nesting Repeated Groupings is not supported yet."
             )
@@ -298,7 +364,14 @@ def node_dict_to_component(all_nodes: dict, node: dict, level: int, parent):
 
 
 def gui_init(meta_data: dict) -> dict:
-    # Create the form and load the json builder into it.
+    """Initializes the form.
+
+    Initialization of the form and the components therein.
+
+    Returns:
+        payload:    Form definition, as {"form": Form object}
+    """
+    _init_env(meta_data)
     form = Form()
 
     convert_api_to_app(form)
@@ -307,18 +380,43 @@ def gui_init(meta_data: dict) -> dict:
         with open(os.path.join(LOCATIONS["generated"], "created_form.json"), "w+") as f:
             print(form.jsonEncode(), file=f)
 
-    return {"form": form}
+    return {
+        "form": form,
+        "navbar": {
+            "title": CONFIG["app_title"],
+            "subtitle": CONFIG["app_subtitle"],
+        },
+    }
 
 
 def gui_event(meta_data: dict, payload: dict) -> dict:
-    Form.eventHandler(RunWorkflow=run_workflow)
+    """Event handling of the application.
+
+    Args:
+        meta_data:      Form meta data.
+        payload:        Current status of the Form's contents.
+
+    Returns:
+        payload:        Updated Form contents.
+    """
+    _init_env(meta_data)
+    Form.eventHandler(
+        RunWorkflow=run_workflow,
+    )
     callback = utils.getEventFunction(meta_data, payload)
     return callback(meta_data, payload)
 
 
-def run_workflow(_meta_data, payload):
-    print(payload["submission"]["data"])
+def _init_env(meta_data: dict):
+    """Set the environment variables and module variables."""
+    for key, value in meta_data["application_data"].items():
+        os.environ[key] = value
 
+    simian.comfy.connect.init()
+
+
+def run_workflow(meta_data, payload) -> dict:
+    """Run workflow event process."""
     with open(LOCATIONS["workflow"]) as f:
         prompt = json.load(f)
 
@@ -329,9 +427,46 @@ def run_workflow(_meta_data, payload):
         with open(os.path.join(LOCATIONS["generated"], "sent_prompt.json"), "w+") as f:
             json.dump(prompt, f)
 
-    data = json.dumps({"prompt": prompt}).encode("utf-8")
-    req = request.Request("http://127.0.0.1:8188/prompt", data=data)
-    request.urlopen(req)
+    _prompt_id, files = simian.comfy.connect.run_workflow(
+        prompt,
+        session_id=meta_data["session_id"],
+    )
+
+    session_folder = utils.getSessionFolder(meta_data, create=True)
+
+    file_names = []
+    for node_id in files:
+        for image_data in files[node_id]:
+            byte_stream = io.BytesIO(image_data["data"])
+
+            # Save the result image in the session folder of the app.
+            image = Image.open(byte_stream)
+            filename = os.path.join(session_folder, image_data["meta"]["filename"])
+            image.save(filename)
+            image.close()
+
+            file_names.append(filename)
+
+    if len(file_names) > 0:
+        if CONFIG["default_results_download"]:
+            component.ResultFile.upload(
+                file_names,
+                ["image/png"] * len(file_names),
+                meta_data,
+                payload,
+                key="results_file",
+                append=True,
+            )
+
+        if CONFIG["custom_results_download"] is not None:
+            try:
+                CONFIG["custom_results_download"](payload, file_names)
+            except Exception as exc:
+                utils.addAlert(payload, f"Custom results processing failed: {exc.message}", "error")
+
+        utils.addAlert(payload, "Results files detected and obtained from server.", "info")
+    else:
+        utils.addAlert(payload, "No results files detected.", "info")
 
     return payload
 
@@ -395,6 +530,8 @@ def process_image_to_str(file_data: list[dict] | list[dict]) -> str:
     """
     if isinstance(file_data, list) and len(file_data) > 0:
         file_data = file_data[0]
+    elif isinstance(file_data, dict):
+        pass
     else:
         file_data = {}
 
