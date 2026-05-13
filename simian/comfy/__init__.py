@@ -222,7 +222,7 @@ def create_comp(node: dict) -> component.Component | None:
 
         # Use the image selected in the File component as background in the Plotly component.
         plot_obj.calculateValue = (
-            "var new_value = value; var comp = row.upload_"
+            "var new_value = value ?? {layout: {}}; var comp = row.upload_"
             + node["id"]
             + "; if (comp.length > 0) { new_value.layout.images = [{'source': comp[0].url, "
             + "'x': 0.5, 'y': 0.5, 'xref': 'paper', 'yref': 'paper', 'xanchor': 'center', "
