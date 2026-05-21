@@ -37,7 +37,13 @@ Note that the example app consists of:
 
 ## Extending the app
 
-The standard Simian-Comfy functionality creates a functional app from your workflow API. It is possible to extend the standard application with extra Simian-gui controls and event callbacks, which are described in more detail in the [documentation](https://doc.simiansuite.com/simian-gui/index.html)
+The standard Simian-Comfy functionality dynamically creates a functional app from your workflow API. It is possible to extend the standard application with extra Simian-gui controls and event callbacks, which are described in more detail in the [documentation](https://doc.simiansuite.com/simian-gui/index.html)
+
+To freeze the app that is created from the workflow API:
+
+- Temporarily set the CONFIG["save_intermediates"] to `True` to create a `created_form.json` in the `generated` subfolder.
+- In your webapp module, remove the `gui_init` import from `simian.comfy`, as this inserts the dynamic part in your app.
+- Add a standard `simian.gui` `gui_init` function in your app module and use the `created_form.json` as an input of the `Form` constructor method. Note that you can edit the JSON file in the `Simian Builder` to add more components and/or change the layout of the existing ones.
 
 ### Adding controls to the app
 
