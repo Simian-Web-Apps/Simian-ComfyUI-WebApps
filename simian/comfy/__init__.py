@@ -43,6 +43,7 @@ import glob
 import io
 import json
 import math
+import mimetypes
 import os
 import re
 from typing import Sequence
@@ -131,10 +132,10 @@ def add_group(type_str: str, group_dict, parent) -> component.Component:
             col_comp = component.Columns(key=f"comp_{group_dict['id']}", parent=parent)
             new_width = 6
 
-        new_col = component_properties.Column(new_width)
-        new_comp = col_comp.addColumn(new_col)
+        new_comp = component_properties.Column(new_width)
+        col_comp.addColumn(new_comp)
 
-        descr = component.HtmlElement(f"label_{group_dict['id']}", parent=new_col)
+        descr = component.HtmlElement(f"label_{group_dict['id']}", parent=new_comp)
         descr.content = group_dict["_meta"]["title"]
 
     else:
@@ -190,10 +191,11 @@ def create_comp(node: dict) -> component.Component | None:
     elif node["class_type"] == "WebApp_Selectioninput":
         # Select component
         options = node["inputs"].get("options", [])
+        full_options = node["inputs"].get("full_options", options)
         new_comp = component.Select(f"comp_{node['id']}")
         new_comp.label = node["_meta"]["title"]
         new_comp.setValues(
-            labels=options, values=options, default=node["inputs"].get("default", None)
+            labels=options, values=full_options, default=node["inputs"].get("default", None)
         )
         new_comp.multiple = node["inputs"].get("maximum", 1) > 1
 
@@ -449,9 +451,10 @@ def run_workflow(meta_data, payload) -> dict:
 
     if len(file_names) > 0:
         if CONFIG["default_results_download"]:
+            mime_types = [mimetypes.guess_type(file)[0] for file in file_names]
             component.ResultFile.upload(
                 file_names,
-                ["image/png"] * len(file_names),
+                mime_types,
                 meta_data,
                 payload,
                 key="results_file",
@@ -462,7 +465,7 @@ def run_workflow(meta_data, payload) -> dict:
             try:
                 CONFIG["custom_results_download"](payload, file_names)
             except Exception as exc:
-                utils.addAlert(payload, f"Custom results processing failed: {exc.message}", "error")
+                utils.addAlert(payload, f"Custom results processing failed: {exc}", "danger")
 
         utils.addAlert(payload, "Results files detected and obtained from server.", "info")
     else:
@@ -555,7 +558,6 @@ def process_mask_to_str(plot_data: dict) -> str:
 
     if len(backgrounds) == 0 or len(shapes) == 0:
         # No background image or no shapes drawn.
-        # mask_image = Image.new("L", (100, 100), 0)
         return ""
 
     else:
