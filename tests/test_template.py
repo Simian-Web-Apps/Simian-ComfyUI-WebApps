@@ -1,11 +1,14 @@
 """Tests for the example and template."""
 
 import base64
+import importlib
 import os.path
-from simian.gui import testing, utils
-from simian.comfy import CONFIG
-import plotly
 from unittest import mock
+
+import plotly
+from simian.gui import testing, utils
+
+from simian.comfy import CONFIG
 
 YCOORD_ID = "34"
 BACKGROUND_ID = "30"
@@ -16,6 +19,11 @@ EXAMPLE_FILE = os.path.join(os.path.dirname(__file__), "example.png")
 class TestTemplate(testing.Testing):
     namespace = "simian.comfy.template.comfy_webapp"
     add_meta_data = {"application_data": {}}
+
+    def __init__(self):
+        """Reload the template module to ensure everything is imported correctly."""
+        importlib.import_module(self.namespace)
+        super().__init__()
 
     def test_startup(self):
         # The template does not contain a ComfyUI workflow, so the form will only contain a label that mentions this.

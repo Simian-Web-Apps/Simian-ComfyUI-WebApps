@@ -1,9 +1,9 @@
 """Tests for the create_comp function."""
 
-from simian.gui import component, component_properties
-from simian.comfy import create_comp
 import pytest
+from simian.gui import component, component_properties
 
+from simian.comfy import create_comp
 
 ID = "28"
 

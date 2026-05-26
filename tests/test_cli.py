@@ -1,11 +1,12 @@
 """Test the CLI."""
 
+import glob
 import importlib
-import sys
 import os
 import shutil
+import sys
+
 import pytest
-import glob
 
 
 # Helper to import the module with a custom sys.argv

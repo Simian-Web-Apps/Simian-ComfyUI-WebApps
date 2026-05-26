@@ -535,6 +535,8 @@ def process_image_to_str(file_data: list[dict] | list[dict]) -> str:
         file_data = file_data[0]
     elif isinstance(file_data, dict):
         pass
+    elif isinstance(file_data, str) and os.path.isfile(file_data):
+        file_data = {"url": utils.encodeImage(file_data)}
     else:
         file_data = {}
 

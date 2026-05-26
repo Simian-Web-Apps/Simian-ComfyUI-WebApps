@@ -1,8 +1,8 @@
 """Tests for the node_dict_to_component function."""
 
 from simian.gui import component
-from simian.comfy import node_dict_to_component
 
+from simian.comfy import node_dict_to_component
 
 ID = "28"
 

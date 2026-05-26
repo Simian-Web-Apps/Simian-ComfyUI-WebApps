@@ -1,9 +1,9 @@
 """Tests for the add_group function."""
 
-from simian.gui import component, component_properties
-from simian.comfy import add_group
 import pytest
+from simian.gui import component, component_properties
 
+from simian.comfy import add_group
 
 ID = "28"
 
