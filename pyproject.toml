@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "Simian-ComfyUI-WebApps"
 description = "Simian webapp integration for ComfyUI webapp api nodes."
@@ -15,8 +19,7 @@ requires-python = ">= 3.10"
 optional-dependencies.dev = ["simian-builder"]
 optional-dependencies.test = ["pytest", "pytest-cov"]
 version = '0.1.0'
-license = "GNU General Public License v3.0"
-license-files = ["LICENSE"]
+license = { "text" = "GNU General Public License v3.0" }
 
 [tool.ruff]
 line-length = 100
