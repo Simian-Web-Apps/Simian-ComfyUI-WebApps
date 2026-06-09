@@ -53,7 +53,7 @@ from PIL import Image, ImageDraw
 from simian.gui import Form, component, component_properties, utils
 
 import simian.comfy.connect
-from interpret_json import process_workflow_api
+from simian.comfy.interpret_json import process_workflow_api
 
 try:
     import webview

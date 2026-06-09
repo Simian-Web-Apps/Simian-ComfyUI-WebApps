@@ -1,0 +1,4 @@
+include simian/comfy/examples/**/*.css
+include simian/comfy/examples/**/*.json
+include simian/comfy/template/css/*.css
+include simian/comfy/template/requirements.txt
