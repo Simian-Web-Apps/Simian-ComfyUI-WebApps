@@ -381,9 +381,6 @@ def gui_init(meta_data: dict) -> dict:
     _init_env(meta_data)
     form = Form()
 
-    plotly = component.Plotly("dummy", form)
-    # plotly.hidden = True
-
     convert_api_to_app(form)
 
     if LOCATIONS["workflow"] is not None and CONFIG.get("save_intermediates", False):
