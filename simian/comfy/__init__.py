@@ -214,12 +214,19 @@ def create_comp(node: dict) -> component.Component | None:
 
         plot_obj = component.Plotly(f"plot_{node['id']}", parent=new_comp)
         plot_obj.figure = go.Figure()
-        plot_obj.figure.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0}, dragmode=False)
+        plot_obj.figure.update_layout(
+            margin={"l": 0, "r": 0, "t": 0, "b": 0},
+            dragmode=False,
+            xaxis_range=[0, 1],
+            xaxis_visible=False,
+            yaxis_range=[0, 1],
+            yaxis_visible=False,
+        )
         plot_obj.aspectRatio = 2
         plot_obj.defaultValue["config"].update(
             {"modeBarButtonsToRemove": ["pan", "zoom", "zoomin", "zoomout"]}
         )
-        plot_obj.customConditional = f"show = row.upload_{node['id']}.length > 0"
+        # plot_obj.customConditional = f"show = row.upload_{node['id']}.length > 0"
         plot_obj.redrawOn = "data"
 
         # Use the image selected in the File component as background in the Plotly component.
@@ -228,9 +235,7 @@ def create_comp(node: dict) -> component.Component | None:
             + node["id"]
             + "; if (comp.length > 0) { new_value.layout.images = [{'source': comp[0].url, "
             + "'x': 0.5, 'y': 0.5, 'xref': 'paper', 'yref': 'paper', 'xanchor': 'center', "
-            + "'yanchor': 'middle', 'sizex': 1, 'sizey': 1, 'layer': 'below'}]; "
-            + "new_value.layout.xaxis = {'range': [0, 1], 'visible': false}; "
-            + "new_value.layout.yaxis = {'range': [0, 1], 'visible': false};} "
+            + "'yanchor': 'middle', 'sizex': 1, 'sizey': 1, 'layer': 'below'}]; } "
             + "else if (new_value?.layout === undefined) {} else {new_value.layout.images = []}; "
             + "value = new_value;"
         )
@@ -375,6 +380,9 @@ def gui_init(meta_data: dict) -> dict:
     """
     _init_env(meta_data)
     form = Form()
+
+    plotly = component.Plotly("dummy", form)
+    # plotly.hidden = True
 
     convert_api_to_app(form)
 
