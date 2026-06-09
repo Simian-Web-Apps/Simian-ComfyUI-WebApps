@@ -13,7 +13,6 @@ dependencies = [
     "simian-gui",
     "simian-local",
     "websocket-client~=1.8.0",
-    "webapp-api @ git+https://github.com/MonkeyProof-Solutions-BV/ComfyUI_webapp",
 ]
 requires-python = ">= 3.10"
 optional-dependencies.dev = ["simian-builder"]
