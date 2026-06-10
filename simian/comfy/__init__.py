@@ -545,14 +545,15 @@ def process_image_to_str(meta_data: dict, file_data: list[dict] | list[dict]) ->
         pass
     elif isinstance(file_data, str) and os.path.isfile(file_data):
         file_data = {"url": utils.encodeImage(file_data)}
-    elif isinstance(file_data, str):
-        file_data = {
-            "url": base64.b64encode(_process_url(meta_data, url=file_data)).decode("utf-8")
-        }
     else:
         file_data = {}
 
     url = file_data.get("url", "")
+
+    if url.startswith("data:image"):
+        pass
+    else:
+        url = base64.b64encode(_process_url(meta_data, url=url)).decode("utf-8")
 
     return re.sub(r"^data:image/\w+;base64,", "", url)
 
