@@ -46,6 +46,7 @@ import math
 import mimetypes
 import os
 import re
+import requests
 from typing import Sequence
 
 import plotly.graph_objects as go
@@ -427,7 +428,7 @@ def run_workflow(meta_data, payload) -> dict:
     with open(LOCATIONS["workflow"]) as f:
         prompt = json.load(f)
 
-    process_component_values(prompt, payload["submission"]["data"])
+    process_component_values(meta_data, prompt, payload["submission"]["data"])
 
     if CONFIG.get("save_intermediates", False):
         # Save the prompt we are about to send to a local file for troubleshooting.
@@ -479,7 +480,7 @@ def run_workflow(meta_data, payload) -> dict:
     return payload
 
 
-def process_component_values(prompt: dict, data: dict):
+def process_component_values(meta_data: dict, prompt: dict, data: dict):
     """Process the values selected in the app and put them in the prompt.
 
     Args:
@@ -506,19 +507,21 @@ def process_component_values(prompt: dict, data: dict):
             # Group with sub-components,
 
             # Process the values in the rows at the same time; they need to be put in the same part of the prompt.
-            process_component_values(prompt, {k: [dic[k] for dic in value] for k in value[0]})
+            process_component_values(
+                meta_data, prompt, {k: [dic[k] for dic in value] for k in value[0]}
+            )
 
         elif prompt[workflow_id]["class_type"] == "WebApp_MaskedImageinput":
             # Dealing with an image
             if comp_id.startswith("upload") and len(value) > 0:
                 # Get the base64 encoded representation of the image.
                 prompt[workflow_id]["inputs"]["image_base64"] = json.dumps(
-                    [process_image_to_str(item) for item in value]
+                    [process_image_to_str(meta_data, item) for item in value]
                 )
             elif comp_id.startswith("plot") and len(value) > 0:
                 # Get the base64 encoded representation of the mask.
                 prompt[workflow_id]["inputs"]["mask_base64"] = json.dumps(
-                    [process_mask_to_str(item) for item in value]
+                    [process_mask_to_str(meta_data, item) for item in value]
                 )
             else:
                 # Component does not contain a value to put in the prompt.
@@ -527,7 +530,7 @@ def process_component_values(prompt: dict, data: dict):
             prompt[workflow_id]["inputs"]["value_from_interface"] = json.dumps(value)
 
 
-def process_image_to_str(file_data: list[dict] | list[dict]) -> str:
+def process_image_to_str(meta_data: dict, file_data: list[dict] | list[dict]) -> str:
     """Process the image file selected in the File component.
 
     Args:
@@ -542,6 +545,10 @@ def process_image_to_str(file_data: list[dict] | list[dict]) -> str:
         pass
     elif isinstance(file_data, str) and os.path.isfile(file_data):
         file_data = {"url": utils.encodeImage(file_data)}
+    elif isinstance(file_data, str):
+        file_data = {
+            "url": base64.b64encode(_process_url(meta_data, url=file_data)).decode("utf-8")
+        }
     else:
         file_data = {}
 
@@ -550,7 +557,7 @@ def process_image_to_str(file_data: list[dict] | list[dict]) -> str:
     return re.sub(r"^data:image/\w+;base64,", "", url)
 
 
-def process_mask_to_str(plot_data: dict) -> str:
+def process_mask_to_str(meta_data: dict, plot_data: dict) -> str:
     """Process the image mask that was drawn in the Plotly component.
 
     Args:
@@ -568,8 +575,15 @@ def process_mask_to_str(plot_data: dict) -> str:
         return ""
 
     else:
-        source_str = re.sub(r"^data:image/\w+;base64,", "", backgrounds[0].get("source", ""))
-        decoded_bytes = base64.b64decode(source_str)
+        source = backgrounds[0].get("source", "")
+        if source.startswith("data:image"):
+            # Base64 encoded image.
+            source_str = re.sub(r"^data:image/\w+;base64,", "", source)
+            decoded_bytes = base64.b64decode(source_str)
+        else:
+            # Image is accessible via a url.
+            decoded_bytes = _process_url(meta_data, source)
+
         byte_stream = io.BytesIO(decoded_bytes)
         im = Image.open(byte_stream)
 
@@ -604,3 +618,32 @@ def process_mask_to_str(plot_data: dict) -> str:
         new_image.save(os.path.join(LOCATIONS["generated"], "mask.png"))
 
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+
+def _process_url(meta_data: dict, url: str) -> str:
+    if "portal_files" in meta_data:
+        if meta_data["portal_files"]["certs"]["enabled"]:
+            verify = meta_data["portal_files"]["certs"]["cert"]
+
+            if verify == "True":
+                # Not a path: use system defaults (or environment variables).
+                verify = True
+        else:
+            # Verification is disabled.
+            verify = False
+    else:
+        # When not configured at all: use system defaults.
+        verify = True
+
+    headers = {
+        "X-Portal-Upload-Api-Key": meta_data["portal_files_api_key"],
+        "X-Portal-Upload-Tab-Uuid": meta_data["tab_uuid"],
+        "X-Portal-Upload-User": meta_data["client_data"]["authenticated_user"]["username"],
+    }
+
+    with requests.get(url, headers=headers, stream=True, verify=verify) as response:
+        response.raise_for_status()  # Produces 'nice' errors.
+
+        image_bytes = response.content
+
+    return image_bytes
