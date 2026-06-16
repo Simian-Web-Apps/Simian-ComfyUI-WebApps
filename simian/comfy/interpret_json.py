@@ -29,7 +29,7 @@ def process_workflow_api(input_file: str) -> dict[str, list]:
     app_nodes = {"root": []}
 
     for node_id, node_dict in workflow_dict.items():
-        if node_dict["class_type"].startswith("WebApp_"):
+        if node_dict["class_type"].startswith("WebApp_") and "order" in node_dict["inputs"]:
             # Node is a webapp definition node.
             node_dict["id"] = node_id
 
