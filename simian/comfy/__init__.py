@@ -209,9 +209,8 @@ def create_comp(node: dict) -> component.Component | None:
         if new_comp.collapsible:
             new_comp.collapsed = CONFIG["panels_collapsed"]
 
-        if node["inputs"]["is_image_used"]:
-            upload_image = component.File(f"upload_{node['id']}", parent=new_comp)
-            upload_image.filePattern = "image/*"
+        upload_image = component.File(f"upload_{node['id']}", parent=new_comp)
+        upload_image.filePattern = "image/*"
 
         plot_obj = component.Plotly(f"plot_{node['id']}", parent=new_comp)
         plot_obj.figure = go.Figure()
@@ -227,14 +226,14 @@ def create_comp(node: dict) -> component.Component | None:
         plot_obj.defaultValue["config"].update(
             {"modeBarButtonsToRemove": ["pan", "zoom", "zoomin", "zoomout"]}
         )
-        # plot_obj.customConditional = f"show = row.upload_{node['id']}.length > 0"
+        plot_obj.customConditional = f"show = row.upload_{node['id']}?.length > 0"
         plot_obj.redrawOn = "data"
 
         # Use the image selected in the File component as background in the Plotly component.
         plot_obj.calculateValue = (
             "var new_value = value ?? {layout: {}}; var comp = row.upload_"
             + node["id"]
-            + "; if (comp.length > 0) { new_value.layout.images = [{'source': comp[0].url, "
+            + "; if (comp?.length > 0) { new_value.layout.images = [{'source': comp[0].url, "
             + "'x': 0.5, 'y': 0.5, 'xref': 'paper', 'yref': 'paper', 'xanchor': 'center', "
             + "'yanchor': 'middle', 'sizex': 1, 'sizey': 1, 'layer': 'below'}]; } "
             + "else if (new_value?.layout === undefined) {} else {new_value.layout.images = []}; "
@@ -259,6 +258,11 @@ def create_comp(node: dict) -> component.Component | None:
                     ]
                 }
             )
+
+        # Put the non-empty defaultValues in the defaultValue property of the Panel.
+        new_comp.defaultValue = {
+            c.key: c.defaultValue for c in new_comp.components if c.defaultValue
+        }
 
     else:
         # Not a normal component. Return a None.
@@ -366,6 +370,19 @@ def node_dict_to_component(all_nodes: dict, node: dict, level: int, parent) -> N
 
         for child in child_nodes:
             node_dict_to_component(all_nodes, child, level=level + 1, parent=new_sub_comp)
+
+        default_row = {}
+        for comp in new_sub_comp.components:
+            if isinstance(comp, component.Panel):
+                # The Panel sub-component does not add a extra layer in the data. Put the defaultVaules
+                # Of its subcomponents directly in the defaultValue of the DataGrid.
+                default_row.update(comp.defaultValue)
+            else:
+                default_row.update(
+                    {c.key: c.defaultValue for c in new_sub_comp.components if c.defaultValue}
+                )
+
+        new_sub_comp.defaultValue = [default_row]
 
     else:
         print(node)
