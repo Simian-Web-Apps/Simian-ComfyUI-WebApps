@@ -1,6 +1,6 @@
 # Simian-ComfyUI-WebApps
 
-The [Simian WebApps](https://simiansuite.com/) - [ComfyUI](https://docs.comfy.org/) integration package implements the [ComfyUI WebApp API definition](github.com/MonkeyProof-Solutions-BV/ComfyUI_webapp) for Simian Apps*.
+The [Simian WebApps](https://simiansuite.com/) - [ComfyUI](https://docs.comfy.org/) integration package implements the [ComfyUI WebApp API definition](https://github.com/MonkeyProof-Solutions-BV/ComfyUI_webapp) for Simian Apps*.
 
 The ComfyUI WebApp API nodes allow you to define web app interfaces directly within ComfyUI workflows. This package interprets those definitions to automatically generate a Simian app, eliminating the need for additional coding.
 
