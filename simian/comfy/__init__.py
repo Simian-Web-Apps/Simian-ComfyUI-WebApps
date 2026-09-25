@@ -282,7 +282,7 @@ def scan_resources(calling_file: str):
 
     for file in folder_jsons:
         full_file = os.path.join(app_folder, file)
-        with open(full_file, "r") as f:
+        with open(full_file, "rb") as f:
             try:
                 json_dict = json.load(f)
             except Exception:
@@ -442,7 +442,7 @@ def _init_env(meta_data: dict):
 
 def run_workflow(meta_data, payload) -> dict:
     """Run workflow event process."""
-    with open(LOCATIONS["workflow"]) as f:
+    with open(LOCATIONS["workflow"], "rb") as f:
         prompt = json.load(f)
 
     process_component_values(meta_data, prompt, payload["submission"]["data"])

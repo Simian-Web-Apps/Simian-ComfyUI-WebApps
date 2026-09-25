@@ -18,10 +18,10 @@ def process_workflow_api(input_file: str) -> dict[str, list]:
     Returns:
         Dictionary with for each parent node the children nodes.
     """
-    with open(input_file) as f:
+    with open(input_file, "rb") as f:
         workflow_dict = json.load(f)
         f.seek(0, 0)
-        workflow_str = f.read()
+        workflow_str = str(f.read())
 
     # Check API json: all root children are node dicts. No 'nodes' and 'links' lists.
     assert "nodes" not in workflow_dict and "links" not in workflow_dict
